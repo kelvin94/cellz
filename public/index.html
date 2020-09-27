@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    
+
+
+    
+    <button id = 'btnCreate'>New Game</button>
+    <button id = 'btnJoin'>Join Game</button>
+    <input type = 'text' id = 'txtGameId'>
+    <span id='roomId'></span>
+    <div id  = 'divPlayers'></div>
+    <div id  = 'divBoard'></div>
+</body>
+
+
+<script>
+    //HTML elements
+    let clientId = null;
+    let gameId = null;
+    let playerColor = null;
+
+    const btnCreate = document.getElementById("btnCreate");
+    const btnJoin = document.getElementById("btnJoin");
+    const txtGameId = document.getElementById("txtGameId");
+    const divPlayers = document.getElementById("divPlayers");
+    const divBoard = document.getElementById("divBoard");
+
+    // Message Types Constants
+    var CREATE_GAME = "createGame"
+    var INIT_CONNECTION = "initConnection"
+    var JOIN_GAME = "joinGame"
+    var UPDATE_GAME = "update";
+    var PLAY_GAME = "play";
+    btnCreate.addEventListener('click', (event) => {
+        const payload = {
+                payload: {
+                "messageType":  CREATE_GAME,
+                "clientId": clientId
+            }
+        };
+
+        ws.send(JSON.stringify(payload));
+    });
+
+    btnJoin.addEventListener('click', (event) => {
+        let message = {};
+        
+        if(txtGameId.value) gameId = txtGameId.value;
+        if(gameId) {
+            message = {
+                payload: {
+                    "messageType":  JOIN_GAME,
+                    "clientId": clientId,
+                    "gameId": gameId
+                }
+            };
+        } else if(txtGameId.value) {
+            message = {
+                payload: {
+                    "messageType":  JOIN_GAME,
+                    "clientId": clientId,
+                    "gameId": txtGameId.value
+                }
+            };
+        } else {
+            alert("Attempting to join a game but cannot join");
+            return;
+        }
+        ws.send(JSON.stringify(message));
+    });
+
+    let ws = new WebSocket('ws://192.168.66.112:9090/');
+    
+    // WebSocket.onmessage property is an EventHandler that is called when a message is received from the server.
+    ws.onmessage = message => {
+        // message structure:
+        // Json, property: data
+        const response = JSON.parse(message.data);
+        console.log("received data from server"+response.payload);
+
+        if(response.payload.messageType == INIT_CONNECTION) {
+            
+            clientId = response.payload.clientId;
+            
+            console.log("Client ID is set: " + clientId);
+        }
+        
+        if(response.payload.messageType == CREATE_GAME) {
+            gameId = response.payload.gameId;
+            console.log("game Id is set: " + gameId);
+            // javascript to append the gameID beside the input box of the "join button"
+            if(gameId) txtGameId.value = gameId
+        }
+
+        if(response.payload.messageType == UPDATE_GAME) {
+            const game = response.payload.game;
+            if('winner' in  game) {
+                alert(`${game.winner} is the winner!`)
+                return;
+            }
+            console.log("Server sends me update_game message")
+            const state = game.state; // state is a hashmap: key-> ballId, value-> color
+            for (var ballId in state) {
+                const ballColor = state[ballId];
+                const cell = document.getElementById("ball"+ballId);
+                console.log("Front end gets cell: "+ballId);
+                if(cell) {
+                    // console.log("Front end gets cell: "+ballId);
+                    // if(!state[ballId] || cell.style.backgroundColor != ballColor) {
+                        console.log("Cell "+ ballId+" color changes to: " + ballColor);
+                        cell.style.backgroundColor = ballColor;
+                    // }
+                } 
+            }
+
+        }
+
+        if(response.payload.messageType == JOIN_GAME) {
+
+            // playerColor = response.payload.playerColor;
+            // initliazie the game board
+            const game = response.payload.game;
+            const roomIdElement = document.getElementById('roomId');
+            roomIdElement.textContent = 'You are in RoomID: '+game.gameId
+            while(divPlayers.firstChild)
+                    divPlayers.removeChild (divPlayers.firstChild)
+
+            game.clients.forEach (c => {
+                console.log("JOIN_GAME messsage c.playerColor: "+JSON.stringify(c))
+                const d = document.createElement("div");
+                d.style.width = "300px";
+                d.style.background = c.clientColor
+                
+                if (c.clientId === clientId) d.textContent = "Player(Yourself): "+c.clientId;
+                else d.textContent = "Player: "+c.clientId;
+                divPlayers.appendChild(d);
+                if (c.clientId === clientId) playerColor = c.clientColor;
+            })
+
+
+            while(divBoard.firstChild)
+            divBoard.removeChild (divBoard.firstChild)
+
+            for (let i = 0; i < game.balls; i++){
+                const cell = document.createElement("button");
+                cell.id = "ball" + (i +1);
+                cell.tag = i+1;
+                cell.textContent = i+1
+                cell.style.width = "150px"
+                cell.style.height = "150px"
+                cell.addEventListener("click", e => {
+                    if(!playerColor) alert("playerColor empty")
+                    cell.style.background = playerColor;
+
+                    const payLoad = {
+                        payload: {
+                            "messageType": PLAY_GAME,
+                            "clientId": clientId,
+                            "gameId": gameId,
+                            "ballId": cell.tag,
+                            "playerColor": playerColor
+                        }
+                    };
+                    ws.send(JSON.stringify(payLoad));
+                })
+                divBoard.appendChild(cell);
+            }
+        }
+    };
+    
+    
+    
+
+</script>
+
+</html>
