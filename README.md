@@ -1,5 +1,6 @@
-<h1> Cellz is a game that allows 3 clients(brower) to race to click 5 cells</h1>
 ![Cellz Demo](CellzDemo.gif)
+
+<h1> Cellz is a game that allows 3 clients(brower) to race to click 5 cells</h1>
 <ul>
     Tech Stack
     <li> Vanilla JavaScript</li>
